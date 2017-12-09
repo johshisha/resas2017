@@ -25,6 +25,7 @@ create table if not exists stores (
   lat float,
   lng float,
   beacon_id varchar(255),
+  visitor_count int default 0,
   index idx_location(lat, lng)
 );
 ```
