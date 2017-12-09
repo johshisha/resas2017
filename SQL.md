@@ -47,7 +47,7 @@ create table if not exists items (
   id int not null primary key auto_increment,
   store_id int,
   url text,
-  description varchar(255),
+  label varchar(255),
   foreign key(store_id) references stores(id)
 );
 ```
