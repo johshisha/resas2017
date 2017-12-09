@@ -10,8 +10,14 @@ from linebot.exceptions import (
 from linebot.models import (
     MessageEvent, TextMessage, TextSendMessage,
     TemplateSendMessage, CarouselTemplate, CarouselColumn,
-    MessageTemplateAction, URITemplateAction
+    MessageTemplateAction, URITemplateAction, PostbackTemplateAction,
+    ImageCarouselTemplate, ImageCarouselColumn
 )
+
+import json
+# import urllib
+import requests
+import urllib.parse
 
 app = Flask(__name__)
 app.config.from_pyfile('./secret.cfg')
@@ -58,7 +64,7 @@ def callback():
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     msg = carousel_view(event.message.text)
-    line_bot_api.reply_message(event.reply_token, msg) # msg)
+    line_bot_api.reply_message(event.reply_token, msg)
 
 def handle_posted_text(text):
     app.logger.info("Posted text: " + text)
@@ -96,6 +102,46 @@ def carousel_view(text):
         alt_text='Carousel template',
         template=CarouselTemplate(columns=columns)
     )
+    return msg
+
+def image_carousel_view(text):
+    columns_list = []
+
+    for i in range(10):
+        columns_list.append(
+            ImageCarouselColumn(
+                image_url='https://example.com/item1.jpg',
+                action=PostbackTemplateAction(
+                    label='postback1',
+                    text='postback text1',
+                    data='action=buy&itemid=1'
+                )
+            )
+        )
+
+    msg = TemplateSendMessage(
+        alt_text='ImageCarousel template',
+        template=ImageCarouselTemplate(columns=columns_list)
+    )
+    return msg
+
+def googlemap_link(text):
+    api_key = app.config['GOOGLE_API_KEY']
+    base_url = "https://maps.googleapis.com/maps/api/geocode/json?"
+    query = urllib.parse.urlencode({
+        "address": text,
+        "key": api_key
+    })
+    url = base_url + query
+    try:
+        req = requests.get(url)
+        result = json.loads(req.text)
+        lat = result["results"][0]["geometry"]["location"]["lat"]
+        lng = result["results"][0]["geometry"]["location"]["lng"]
+        msg = TextSendMessage(text="comgooglemaps://?ll=%f,%f&q=%s" % (lat, lng, text))
+    except:
+        msg = TextSendMessage(text="申し訳有りません。「%d」は見つかりませんでした。" % text)
+
     return msg
 
 if __name__ == "__main__":
