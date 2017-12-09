@@ -1,0 +1,70 @@
+{
+  "kiyomizudera": [
+      {
+          "image": "https://www.hakuchikudo-original.jp/img/7525kami.jpg",
+          "name": "三年坂老舗",
+          "description": "扇子売ってるよ",
+          "item": "アイテム",
+          "detail": "三年坂老舗の詳細だよーーーー",
+          "item_images": [
+              "https://www.hakuchikudo-original.jp/img/7525kami.jpg",
+              "https://cdn.jalan.jp/jalan/img/6/kuchikomi/2656/KL/cc60c_0002656275_1.jpg"
+          ],
+          "location": {
+              "lat": 56.2,
+              "lng": 145.9
+          },
+          "beacon_id": "0000019382"
+      },
+      {
+          "image": "https://img.guide.travel.co.jp/article/280/26598/DD84BAB7871E4119B0B20E2EEFE9915E_LL.jpg",
+          "name": "八坂老舗",
+          "description": "抹茶売ってるよ",
+          "item": "アイテム",
+          "detail": "八坂老舗の詳細だよーーーー",
+          "item_images": [
+              "https://img.guide.travel.co.jp/article/280/26598/DD84BAB7871E4119B0B20E2EEFE9915E_LL.jpg",
+              "https://tabetainjya.com/img/1704/tagashirachaho2.jpg"
+          ],
+          "location": {
+              "lat": 56.2,
+              "lng": 145.9
+          },
+          "beacon_id": "0"
+      }
+  ],
+  "hushimiinari": [
+    {
+        "image": "https://www.hakuchikudo-original.jp/img/7525kami.jpg",
+        "name": "伏見老舗",
+        "description": "扇子売ってるよ",
+        "item": "アイテム",
+        "detail": "伏見老舗の詳細だよーーーー",
+        "item_images": [
+            "https://www.hakuchikudo-original.jp/img/7525kami.jpg",
+            "https://cdn.jalan.jp/jalan/img/6/kuchikomi/2656/KL/cc60c_0002656275_1.jpg"
+        ],
+        "location": {
+            "lat": 56.2,
+            "lng": 145.9
+        },
+        "beacon_id": "0"
+    },
+    {
+        "image": "https://img.guide.travel.co.jp/article/280/26598/DD84BAB7871E4119B0B20E2EEFE9915E_LL.jpg",
+        "name": "稲荷老舗",
+        "description": "抹茶売ってるよ",
+        "item": "アイテム",
+        "detail": "稲荷老舗の詳細だよーーーー",
+        "item_images": [
+            "https://img.guide.travel.co.jp/article/280/26598/DD84BAB7871E4119B0B20E2EEFE9915E_LL.jpg",
+            "https://tabetainjya.com/img/1704/tagashirachaho2.jpg"
+        ],
+        "location": {
+            "lat": 26.2,
+            "lng": 125.9
+        },
+        "beacon_id": "0"
+    }
+  ]
+}

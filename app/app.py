@@ -29,41 +29,9 @@ IGNORE_TEXT_LIST = [
     'アイテム',
 ]
 
-kiyomizu = [
-    {
-        # 'image': 'http://new-cloudfront.zekkei-japan.jp/images/spots/aflo_AXHA017114.jpg',
-        'image': 'https://www.hakuchikudo-original.jp/img/7525kami.jpg',
-        'name': '三年坂老舗',
-        'description': '扇子売ってるよ',
-        'item': 'アイテム',
-        'detail': '三年坂老舗の詳細だよーーーー',
-        'item_images': [
-            'https://www.hakuchikudo-original.jp/img/7525kami.jpg',
-            'https://cdn.jalan.jp/jalan/img/6/kuchikomi/2656/KL/cc60c_0002656275_1.jpg',
-            # 'http://www.suzukisensu.com/photo/17015/images/v031118-after031118-007-l.jpg',
-            'https://cdn.jalan.jp/jalan/img/6/kuchikomi/2656/KL/cc60c_0002656275_1.jpg',
-        ],
-        'location': {
-            'lat': 56.2,
-            'lng': 145.9,
-        },
-    },
-    {
-        'image': 'https://img.guide.travel.co.jp/article/280/26598/DD84BAB7871E4119B0B20E2EEFE9915E_LL.jpg',
-        'name': '八坂老舗',
-        'description': '抹茶売ってるよ',
-        'item': 'アイテム',
-        'detail': '八坂老舗の詳細だよーーーー',
-        'item_images': [
-            'https://img.guide.travel.co.jp/article/280/26598/DD84BAB7871E4119B0B20E2EEFE9915E_LL.jpg',
-            'https://tabetainjya.com/img/1704/tagashirachaho2.jpg',
-        ],
-        'location': {
-            'lat': 56.2,
-            'lng': 145.9,
-        },
-    }
-]
+# Load json data
+with open('../data.json') as f:
+    STORE_DATA = json.load(f)
 
 @app.route("/", methods=['POST'])
 def callback():
@@ -96,12 +64,13 @@ def handle_message(event):
 
 @handler.add(PostbackEvent)
 def handle_postback(event):
-    view = handle_posted_postback(event.postback.data)
-    line_bot_api.reply_message(event.reply_token, view)
+    params = {d.split('=')[0]: d.split('=')[1] for d in event.postback.data.split('&')}
+    if params['action'] == 'show_items':
+        view = handle_posted_postback(params)
+        line_bot_api.reply_message(event.reply_token, view)
 
-def handle_posted_postback(data):
-    params = {d.split('=')[0]: d.split('=')[1] for d in data.split('&')}
-    store = kiyomizu[int(params['id'])]
+def handle_posted_postback(params):
+    store = handle_posted_text(params['text'])[int(params['id'])]
     view = image_carousel_view(store['item_images'])
     return view
 
@@ -128,7 +97,9 @@ def is_proper_noun(text):
 def handle_posted_text(text):
     app.logger.info("Posted text: " + text)
     if text == '清水寺':
-        ret = kiyomizu
+        ret = STORE_DATA['kiyomizudera']
+    elif text == '伏見稲荷':
+        ret = STORE_DATA['hushimiinari']
     else:
         ret = '見つからなかったよ'
 
@@ -148,7 +119,7 @@ def carousel_view(text):
             actions=[
                 PostbackTemplateAction(
                     label='アイテム', text='アイテム',
-                    data='action=show_items&id=%d' % i
+                    data='text=%s&action=show_items&id=%d' % (text, i)
                 ),
                 URITemplateAction(
                     label='詳細',
