@@ -11,7 +11,7 @@ from linebot.exceptions import (
     InvalidSignatureError
 )
 from linebot.models import (
-    MessageEvent, PostbackEvent,
+    MessageEvent, PostbackEvent, BeaconEvent,
     TemplateSendMessage, TextMessage, TextSendMessage,
     MessageTemplateAction, URITemplateAction, PostbackTemplateAction,
     CarouselTemplate, CarouselColumn, ImageCarouselTemplate, ImageCarouselColumn
@@ -73,6 +73,19 @@ def handle_posted_postback(params):
     store = handle_posted_text(params['text'])[int(params['id'])]
     view = image_carousel_view(store['item_images'])
     return view
+
+@handler.add(BeaconEvent)
+def handle_beacon(event):
+    msg = handle_posted_beacon(event.beacon)
+    line_bot_api.reply_message(event.reply_token, msg)
+
+def handle_posted_beacon(data):
+    if data.type == "enter":
+        print("%sの来客数UP!" % data.hwid)
+        msg = TextSendMessage(text="「%s」にようこそ！" % data.hwid)
+    else:
+        msg = TextSendMessage(text="おおきに〜")
+    return msg
 
 def ignore_text(text):
     return text in IGNORE_TEXT_LIST
