@@ -1,4 +1,5 @@
 import os, requests, json, urllib.parse
+from math import sin, cos, acos, radians
 
 from IPython import embed
 from flask import Flask, request, abort
@@ -21,6 +22,8 @@ app.config.from_pyfile('./secret.cfg')
 
 line_bot_api = LineBotApi(app.config['ACCESS_TOKEN'])
 handler = WebhookHandler(app.config['SECRET_KEY'])
+
+earth_rad = 6378.137
 
 IGNORE_TEXT_LIST = [
     'アイテム',
@@ -83,9 +86,13 @@ def callback():
 def handle_message(event):
     if ignore_text(event.message.text):
         pass
-    else:
+    elif is_proper_noun(event.message.text):
         view = carousel_view(event.message.text)
         line_bot_api.reply_message(event.reply_token, view)
+    else:
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text="ん〜〜「%s」は分からないなぁ...\n違う言葉で調べてね!!" % event.message.text))
 
 @handler.add(PostbackEvent)
 def handle_postback(event):
@@ -100,6 +107,23 @@ def handle_posted_postback(data):
 
 def ignore_text(text):
     return text in IGNORE_TEXT_LIST
+
+def is_proper_noun(text):
+    api_key = app.config['GOO_API_KEY']
+    base_url = "https://labs.goo.ne.jp/api/entity"
+    payload = json.dumps({
+        "app_id": api_key,
+        "sentence": text,
+        # ART(人工物名)、ORG(組織名)、PSN(人名)、LOC(地名)
+        "class_filter": "ART|ORG|PSN|LOC"
+    })
+
+    headers = {
+        'content-type': 'application/json'
+    }
+    req = requests.post(base_url, data=payload, headers=headers)
+    result = json.loads(req.text)
+    return True if len(result["ne_list"]) > 0 else False
 
 def handle_posted_text(text):
     app.logger.info("Posted text: " + text)
@@ -175,9 +199,18 @@ def googlemap_link(text):
         lng = result["results"][0]["geometry"]["location"]["lng"]
         msg = TextSendMessage(text="comgooglemaps://?ll=%f,%f&q=%s" % (lat, lng, text))
     except:
-        msg = TextSendMessage(text="申し訳有りません。「%d」は見つかりませんでした。" % text)
+        msg = TextSendMessage(text="申し訳有りません。「%s」は見つかりませんでした。" % text)
 
     return msg
+
+def latlng_to_xyz(lat, lng):
+    rlat, rlng = radians(lat), radians(lng)
+    coslat = cos(rlat)
+    return coslat*cos(rlng), coslat*sin(rlng), sin(rlat)
+
+def dist_on_sphere(pos0, pos1, radious=earth_rad):
+    xyz0, xyz1 = latlng_to_xyz(*pos0), latlng_to_xyz(*pos1)
+    return acos(sum(x * y for x, y in zip(xyz0, xyz1)))*radious
 
 if __name__ == "__main__":
     app.run(debug=True)
