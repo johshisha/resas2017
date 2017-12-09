@@ -40,6 +40,10 @@ kiyomizu = [
             # 'http://www.suzukisensu.com/photo/17015/images/v031118-after031118-007-l.jpg',
             'https://cdn.jalan.jp/jalan/img/6/kuchikomi/2656/KL/cc60c_0002656275_1.jpg',
         ],
+        'location': {
+            'lat': 56.2,
+            'lng': 145.9,
+        },
     },
     {
         'image': 'https://img.guide.travel.co.jp/article/280/26598/DD84BAB7871E4119B0B20E2EEFE9915E_LL.jpg',
@@ -51,6 +55,10 @@ kiyomizu = [
             'https://img.guide.travel.co.jp/article/280/26598/DD84BAB7871E4119B0B20E2EEFE9915E_LL.jpg',
             'https://tabetainjya.com/img/1704/tagashirachaho2.jpg',
         ],
+        'location': {
+            'lat': 56.2,
+            'lng': 145.9,
+        },
     }
 ]
 
