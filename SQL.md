@@ -30,6 +30,17 @@ create table if not exists stores (
 );
 ```
 
+### keyword_relationships
+```sql
+create table if not exists keyword_relationships (
+  id int not null primary key auto_increment,
+  keyword_id int,
+  store_id int,
+  foreign key(keyword_id) references keywords(id),
+  foreign key(store_id) references stores(id)
+);
+```
+
 ### items
 ```sql
 create table if not exists items (
