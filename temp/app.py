@@ -1,4 +1,6 @@
-import os, requests, json
+import os, requests, json, urllib.parse
+
+from IPython import embed
 from flask import Flask, request, abort
 
 from linebot import (
@@ -8,16 +10,11 @@ from linebot.exceptions import (
     InvalidSignatureError
 )
 from linebot.models import (
-    MessageEvent, TextMessage, TextSendMessage,
-    TemplateSendMessage, CarouselTemplate, CarouselColumn,
+    MessageEvent, PostbackEvent,
+    TemplateSendMessage, TextMessage, TextSendMessage,
     MessageTemplateAction, URITemplateAction, PostbackTemplateAction,
-    ImageCarouselTemplate, ImageCarouselColumn
+    CarouselTemplate, CarouselColumn, ImageCarouselTemplate, ImageCarouselColumn
 )
-
-import json
-# import urllib
-import requests
-import urllib.parse
 
 app = Flask(__name__)
 app.config.from_pyfile('./secret.cfg')
@@ -25,21 +22,35 @@ app.config.from_pyfile('./secret.cfg')
 line_bot_api = LineBotApi(app.config['ACCESS_TOKEN'])
 handler = WebhookHandler(app.config['SECRET_KEY'])
 
+IGNORE_TEXT_LIST = [
+    'アイテム',
+]
+
 kiyomizu = [
     {
         # 'image': 'http://new-cloudfront.zekkei-japan.jp/images/spots/aflo_AXHA017114.jpg',
-        'image': 'https://cdn.jalan.jp/jalan/img/6/kuchikomi/2656/KL/cc60c_0002656275_1.jpg',
-        'name': '清水寺',
-        'description': '説明',
+        'image': 'https://www.hakuchikudo-original.jp/img/7525kami.jpg',
+        'name': '三年坂老舗',
+        'description': '扇子売ってるよ',
         'item': 'アイテム',
-        'detail': '清水寺の詳細だよーーーー'
+        'detail': '三年坂老舗の詳細だよーーーー',
+        'item_images': [
+            'https://www.hakuchikudo-original.jp/img/7525kami.jpg',
+            'https://cdn.jalan.jp/jalan/img/6/kuchikomi/2656/KL/cc60c_0002656275_1.jpg',
+            # 'http://www.suzukisensu.com/photo/17015/images/v031118-after031118-007-l.jpg',
+            'https://cdn.jalan.jp/jalan/img/6/kuchikomi/2656/KL/cc60c_0002656275_1.jpg',
+        ],
     },
     {
-        'image': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Kiyomizu_Temple_-_01.jpg/1200px-Kiyomizu_Temple_-_01.jpg',
-        'name': '清水寺2',
-        'description': '説明',
-        'item': 'アイテム2',
-        'detail': '清水寺2の詳細だよーーーー'
+        'image': 'https://img.guide.travel.co.jp/article/280/26598/DD84BAB7871E4119B0B20E2EEFE9915E_LL.jpg',
+        'name': '八坂老舗',
+        'description': '抹茶売ってるよ',
+        'item': 'アイテム',
+        'detail': '八坂老舗の詳細だよーーーー',
+        'item_images': [
+            'https://img.guide.travel.co.jp/article/280/26598/DD84BAB7871E4119B0B20E2EEFE9915E_LL.jpg',
+            'https://tabetainjya.com/img/1704/tagashirachaho2.jpg',
+        ],
     }
 ]
 
@@ -60,34 +71,52 @@ def callback():
 
     return 'OK'
 
-
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    msg = carousel_view(event.message.text)
-    line_bot_api.reply_message(event.reply_token, msg)
+    if ignore_text(event.message.text):
+        pass
+    else:
+        view = carousel_view(event.message.text)
+        line_bot_api.reply_message(event.reply_token, view)
+
+@handler.add(PostbackEvent)
+def handle_postback(event):
+    view = handle_posted_postback(event.postback.data)
+    line_bot_api.reply_message(event.reply_token, view)
+
+def handle_posted_postback(data):
+    params = {d.split('=')[0]: d.split('=')[1] for d in data.split('&')}
+    store = kiyomizu[int(params['id'])]
+    view = image_carousel_view(store['item_images'])
+    return view
+
+def ignore_text(text):
+    return text in IGNORE_TEXT_LIST
 
 def handle_posted_text(text):
     app.logger.info("Posted text: " + text)
-    ret = kiyomizu
+    if text == '清水寺':
+        ret = kiyomizu
+    else:
+        ret = '見つからなかったよ'
 
     return ret
 
 def carousel_view(text):
     data = handle_posted_text(text)
+    if isinstance(data, str):
+        return data
 
     columns = []
-    for d in data:
+    for i, d in enumerate(data):
         carousel_column = CarouselColumn(
             thumbnail_image_url=d['image'],
             title=d['name'],
             text=d['description'],
             actions=[
                 PostbackTemplateAction(
-                    label='アイテム', text='postback text2',
-                    data='action=buy&itemid=2'
-                ),
-                MessageTemplateAction(
-                    label='アイテム', text='{}/アイテム'.format(d['name'])
+                    label='アイテム', text='アイテム',
+                    data='action=show_items&id=%d' % i
                 ),
                 URITemplateAction(
                     label='詳細',
@@ -98,32 +127,30 @@ def carousel_view(text):
         columns.append(carousel_column)
 
 
-    msg = TemplateSendMessage(
+    view = TemplateSendMessage(
         alt_text='Carousel template',
         template=CarouselTemplate(columns=columns)
     )
-    return msg
+    return view
 
-def image_carousel_view(text):
+def image_carousel_view(image_list):
     columns_list = []
-
-    for i in range(10):
+    for image in image_list:
         columns_list.append(
             ImageCarouselColumn(
-                image_url='https://example.com/item1.jpg',
-                action=PostbackTemplateAction(
-                    label='postback1',
-                    text='postback text1',
-                    data='action=buy&itemid=1'
+                image_url=image,
+                action=URITemplateAction(
+                    label='詳細',
+                    uri=image
                 )
             )
         )
 
-    msg = TemplateSendMessage(
+    view = TemplateSendMessage(
         alt_text='ImageCarousel template',
         template=ImageCarouselTemplate(columns=columns_list)
     )
-    return msg
+    return view
 
 def googlemap_link(text):
     api_key = app.config['GOOGLE_API_KEY']
