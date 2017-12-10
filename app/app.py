@@ -21,7 +21,7 @@ from linebot.models import (
     MessageEvent, PostbackEvent, BeaconEvent,
     ImagemapArea, BaseSize,
     TemplateSendMessage, TextMessage, TextSendMessage, ImagemapSendMessage, LocationMessage,
-    MessageTemplateAction, URITemplateAction, PostbackTemplateAction,URIImagemapAction,
+    MessageTemplateAction, URITemplateAction, PostbackTemplateAction,URIImagemapAction, MessageImagemapAction,
     CarouselTemplate, CarouselColumn, ImageCarouselTemplate, ImageCarouselColumn
 )
 
@@ -123,27 +123,27 @@ from
 
     cursor.execute(sql)
     stores = [d for d in cursor.fetchall()]
-    print(stores)
     self_locate_maker = '&markers=color:{}|label:{}|{},{}'.format('blue', '', lat, lng)
-    # タップ可能なピンを配置する
     center_lat_pixel, center_lon_pixel = latlon_to_pixel(lat, lng)
 
-    marker_color = 'red';
-    label = 'E';
+    zoomlevel = 15
+    imagesize = 1040
+    marker_color = 'blue';
+    label = 'S';
 
-    # タップエリアのサイズ
     pin_width = 60 * 1.5;
     pin_height = 84 * 1.5;
 
     actions = []
     self_locate_maker = ''
+
     for i, store in enumerate(stores):
         self_locate = lat, lng
         store_locate = store[1], store[2]
         dist = dist_on_sphere(self_locate, store_locate)
-        print(dist)
-        # 3km以内
-        if dist < 3:
+        # 1km以内
+        if dist < 1:
+            print(dist)
             # 中心の緯度経度をピクセルに変換
             target_lat_pixel, target_lon_pixel = latlon_to_pixel(store[1], store[2])
 
@@ -171,8 +171,6 @@ from
                         height = pin_height
                     )
                 ))
-                if len(actions) > 10:
-                    break
 
     googlemap_staticmap_api_key = app.config['GOOGLE_STATIC_MAPS_API_KEY']
     googlemap_staticmap_base_url = "https://maps.googleapis.com/maps/api/staticmap?"
@@ -182,7 +180,7 @@ from
         "sensor": "false",
         "scale": 2,
         "maptype": "roadmap",
-        "zoom": 18,
+        "zoom": zoomlevel,
         "markers": "%s,%s" % (lat, lng),
         "key": googlemap_staticmap_api_key
     })
@@ -190,11 +188,21 @@ from
     view = ImagemapSendMessage(
         base_url = 'https://{}/imagemap/{}'.format(request.host, urllib.parse.quote_plus(googlemap_staticmap_url)),
         alt_text='googlemap',
-        base_size=BaseSize(height=1040, width=1040),
+        base_size=BaseSize(height=imagesize, width=imagesize),
         actions=actions
     )
 
-    line_bot_api.reply_message(event.reply_token,view)
+    if len(actions) > 0:
+        msg = "ここの近くにはこんな老舗があるよ！"
+    else:
+        msg = "ん〜ここの近くには何もないなぁ"
+
+    line_bot_api.reply_message(event.reply_token,
+        [
+            view,
+            TextSendMessage(text=msg)
+        ]
+    )
 
 def latlon_to_pixel(lat, lon):
     lat_pixel = round(offset + radius * lon * np.pi / 180);
