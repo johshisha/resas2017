@@ -90,7 +90,11 @@ def handle_beacon(event):
 def handle_posted_beacon(data):
     if data.type == "enter":
         print("%sの来客数UP!" % data.hwid)
-        msg = TextSendMessage(text="「%s」にようこそ！" % data.hwid)
+        ret = cursor.execute('select * from stores where beacon_id = "{}";'.format(data.hwid))
+        if ret:
+            store_name = cursor.fetchall()[0][1]
+            cursor.execute('update stores set visitor_count = visitor_count + 1 where beacon_id = "{}";'.format(data.hwid))
+            msg = TextSendMessage(text="「%s」にようこそ！" % store_name)
     else:
         msg = TextSendMessage(text="おおきに〜")
     return msg
