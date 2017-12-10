@@ -49,13 +49,17 @@ REGISTERED_TEXT_LIST = [
     'キーワードリスト'
 ]
 
+REGISTERED_START_WITH = [
+    '店舗名：',
+]
+
 IGNORE_TEXT_LIST = [
     'アイテム',
     'マップ',
 ]
 
 INGORE_START_WITH = [
-    '店舗の詳細\n'
+    '店舗の詳細\n',
 ]
 
 USAGE_TEXT = """
@@ -115,14 +119,14 @@ def handle_location_message(event):
 
     sql = """
 select
-	id, lat, lng
+	name, lat, lng
 from
 	stores
 ;
     """
 
     cursor.execute(sql)
-    stores = [d for d in cursor.fetchall()]
+    stores = cursor.fetchall()
     self_locate_maker = '&markers=color:{}|label:{}|{},{}'.format('blue', '', lat, lng)
     center_lat_pixel, center_lon_pixel = latlon_to_pixel(lat, lng)
 
@@ -163,7 +167,7 @@ from
                 self_locate_maker += '&markers=color:{}|label:{}|{},{}'.format(marker_color, label, store[1], store[2])
 
                 actions.append(MessageImagemapAction(
-                    text = str(store[0]),
+                    text = "店舗名：" + str(store[0]),
                     area = ImagemapArea(
                         x = x - pin_width / 2,
                         y = y - pin_height / 2,
@@ -220,7 +224,7 @@ def handle_postback(event):
         line_bot_api.reply_message(event.reply_token, view)
 
 def handle_posted_postback(params):
-    store = handle_posted_text(params['text'])[int(params['id'])]
+    store = get_store_by_name(params['name'])
     store_id, name, thumbnail, description, detail, lat, lng, beacon_id, visitor_count = store
     items = get_items_from_db(store_id)
     view = image_carousel_view(items)
@@ -239,11 +243,19 @@ order by
 	rand()
 limit 10
 ;
-            """
-
+        """
         cursor.execute(sql)
         ret = '\n'.join([d[0] for d in cursor.fetchall()]).strip()
         view = TextSendMessage(text="現在登録されているキーワードの例\n"+ret)
+    elif text.startswith("店舗名："):
+        store_name = text.replace("店舗名：", "")
+        store = get_store_by_name(store_name)
+        view = TemplateSendMessage(
+            alt_text=store_name,
+            template=CarouselTemplate(columns=[create_carousel_column(store)])
+        )
+    else:
+        raise "Not registered text"
     return view
 
 @handler.add(BeaconEvent)
@@ -275,7 +287,15 @@ def ignore_text(text):
             return False
 
 def regitered_text(text):
-    return text in REGISTERED_TEXT_LIST
+    flag = text in REGISTERED_TEXT_LIST
+    if flag:
+        return flag
+    else:
+        for t in REGISTERED_START_WITH:
+            if text.startswith(t):
+                return True
+        else:
+            return False
 
 def is_proper_noun(text):
     api_key = app.config['GOO_API_KEY']
@@ -315,11 +335,11 @@ def carousel_view(text):
             actions=[
                 PostbackTemplateAction(
                     label='アイテム', text='アイテム',
-                    data='text=%s&action=show_items&id=%d' % (text, i)
+                    data='name=%s&action=show_items' % (name)
                 ),
                 PostbackTemplateAction(
                     label='マップ', text='マップ',
-                    data='text=%s&action=show_maps&id=%d' % (text, i)
+                    data='text=%s&action=show_maps' % (name)
                 ),
                 MessageTemplateAction(
                     label='詳細',
@@ -334,6 +354,29 @@ def carousel_view(text):
         template=CarouselTemplate(columns=columns)
     )
     return view
+
+def create_carousel_column(store):
+    store_id, name, thumbnail, description, detail, lat, lng, beacon_id, visitor_count = store
+    carousel_column = CarouselColumn(
+        thumbnail_image_url=thumbnail,
+        title=name,
+        text=description,
+        actions=[
+            PostbackTemplateAction(
+                label='アイテム', text='アイテム',
+                data='name=%s&action=show_items' % (name)
+            ),
+            PostbackTemplateAction(
+                label='マップ', text='マップ',
+                data='text=%s&action=show_maps' % (name)
+            ),
+            MessageTemplateAction(
+                label='詳細',
+                text="店舗の詳細\n"+detail
+            )
+        ]
+    )
+    return carousel_column
 
 def image_carousel_view(image_list):
     columns_list = []
@@ -408,6 +451,20 @@ def latlng_to_xyz(lat, lng):
 def dist_on_sphere(pos0, pos1, radious=earth_rad):
     xyz0, xyz1 = latlng_to_xyz(*pos0), latlng_to_xyz(*pos1)
     return acos(sum(x * y for x, y in zip(xyz0, xyz1)))*radious
+
+def get_store_by_name(name):
+    sql = """
+select
+	*
+from
+	stores
+where
+    name = "{}"
+;
+    """.format(name)
+    cursor.execute(sql)
+    store = cursor.fetchall()[0]
+    return store
 
 def get_stores_from_db(keyword):
     sql = """
