@@ -1,21 +1,17 @@
-## Create Database
-```sql
+-- ## Create Database
+
 create database resas2017;
 use resas2017;
-```
 
-## Create Tables
-### keywords
-```sql
+-- ## Create Tables
+-- ### keywords
 create table if not exists keywords (
   id int not null primary key auto_increment,
   keyword varchar(255) not null unique,
   index idx_keyword(keyword)
 );
-```
 
-### stores
-```sql
+-- ### stores
 create table if not exists stores (
   id int not null primary key auto_increment,
   name varchar(255) not null unique,
@@ -28,10 +24,8 @@ create table if not exists stores (
   visitor_count int default 0,
   index idx_location(lat, lng)
 );
-```
 
-### keyword_relationships
-```sql
+-- ### keyword_relationships
 create table if not exists keyword_relationships (
   id int not null primary key auto_increment,
   keyword_id int,
@@ -39,10 +33,8 @@ create table if not exists keyword_relationships (
   foreign key(keyword_id) references keywords(id),
   foreign key(store_id) references stores(id)
 );
-```
 
-### items
-```sql
+-- ### items
 create table if not exists items (
   id int not null primary key auto_increment,
   store_id int,
@@ -50,4 +42,3 @@ create table if not exists items (
   label varchar(255),
   foreign key(store_id) references stores(id)
 );
-```
