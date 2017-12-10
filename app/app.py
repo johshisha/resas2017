@@ -17,7 +17,7 @@ from linebot.exceptions import (
 from linebot.models import (
     MessageEvent, PostbackEvent, BeaconEvent,
     ImagemapArea, BaseSize,
-    TemplateSendMessage, TextMessage, TextSendMessage, ImagemapSendMessage,
+    TemplateSendMessage, TextMessage, TextSendMessage, ImagemapSendMessage, LocationMessage,
     MessageTemplateAction, URITemplateAction, PostbackTemplateAction,URIImagemapAction,
     CarouselTemplate, CarouselColumn, ImageCarouselTemplate, ImageCarouselColumn
 )
@@ -39,21 +39,24 @@ handler = WebhookHandler(app.config['SECRET_KEY'])
 
 earth_rad = 6378.137
 
+REGISTERED_TEXT_LIST = [
+    '使い方',
+    'キーワードリスト'
+]
+
 IGNORE_TEXT_LIST = [
     'アイテム',
     'マップ',
 ]
 
-@app.route("/imagemap/<path:url>/<size>", methods=['GET'])
-def imagemap(url, size):
-    map_image_url = urllib.parse.unquote(url)
-    response = requests.get(map_image_url)
-    img = Image.open(BytesIO(response.content))
-    img_resize = img.resize((int(size), int(size)))
-    byte_io = BytesIO()
-    img_resize.save(byte_io, 'PNG')
-    byte_io.seek(0)
-    return send_file(byte_io, mimetype='image/png')
+INGORE_START_WITH = [
+    '店舗の詳細\n'
+]
+
+USAGE_TEXT = """
+入力されたキーワードに縁のある老舗を紹介します．
+「キーワードリスト」と入力すると，現在登録されているキーワードが表示されます．
+""".strip()
 
 @app.route("/", methods=['POST'])
 def callback():
@@ -72,17 +75,42 @@ def callback():
 
     return 'OK'
 
+@app.route("/imagemap/<path:url>/<size>", methods=['GET'])
+def imagemap(url, size):
+    map_image_url = urllib.parse.unquote(url)
+    response = requests.get(map_image_url)
+    img = Image.open(BytesIO(response.content))
+    img_resize = img.resize((int(size), int(size)))
+    byte_io = BytesIO()
+    img_resize.save(byte_io, 'PNG')
+    byte_io.seek(0)
+    return send_file(byte_io, mimetype='image/png')
+  
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    if ignore_text(event.message.text):
+    text = event.message.text
+    if regitered_text(text):
+        view = handle_registered_text(text)
+        line_bot_api.reply_message(event.reply_token, view)
+    elif ignore_text(text):
         pass
-    elif is_proper_noun(event.message.text):
-        view = carousel_view(event.message.text)
+    elif is_proper_noun(text):
+        view = carousel_view(text)
         line_bot_api.reply_message(event.reply_token, view)
     else:
         line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage(text="ん〜〜「%s」は分からないなぁ...\n違う言葉で調べてね!!" % event.message.text))
+            TextSendMessage(text="ん〜〜「%s」は分からないなぁ...\n違う言葉で調べてね!!" % text))
+
+@handler.add(MessageEvent, message=LocationMessage)
+def handle_location_message(event):
+    lat = event.message.latitude
+    lng = event.message.longitude
+    location = "あなたの位置情報\n緯度x経度 = {}x{}".format(lat, lng)
+    line_bot_api.reply_message(
+        event.reply_token,
+        TextSendMessage(text=location)
+    )
 
 @handler.add(PostbackEvent)
 def handle_postback(event):
@@ -101,6 +129,26 @@ def handle_posted_postback(params):
     view = image_carousel_view(items)
     return view
 
+def handle_registered_text(text):
+    if text == '使い方':
+        view = TextSendMessage(text=USAGE_TEXT)
+    elif text == 'キーワードリスト':
+        sql = """
+select
+	keyword
+from
+	keywords
+order by
+	rand()
+limit 10
+;
+            """
+
+        cursor.execute(sql)
+        ret = '\n'.join([d[0] for d in cursor.fetchall()]).strip()
+        view = TextSendMessage(text="現在登録されているキーワードの例\n"+ret)
+    return view
+
 @handler.add(BeaconEvent)
 def handle_beacon(event):
     msg = handle_posted_beacon(event.beacon)
@@ -115,7 +163,18 @@ def handle_posted_beacon(data):
     return msg
 
 def ignore_text(text):
-    return text in IGNORE_TEXT_LIST
+    flag = text in IGNORE_TEXT_LIST
+    if flag:
+        return flag
+    else:
+        for t in INGORE_START_WITH:
+            if text.startswith(t):
+                return True
+        else:
+            return False
+
+def regitered_text(text):
+    return text in REGISTERED_TEXT_LIST
 
 def is_proper_noun(text):
     api_key = app.config['GOO_API_KEY']
@@ -163,7 +222,7 @@ def carousel_view(text):
                 ),
                 MessageTemplateAction(
                     label='詳細',
-                    text=detail
+                    text="店舗の詳細\n"+detail
                 )
             ]
         )
