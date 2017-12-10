@@ -54,8 +54,23 @@ INGORE_START_WITH = [
 ]
 
 USAGE_TEXT = """
-入力されたキーワードに縁のある老舗を紹介します．
-「キーワードリスト」と入力すると，現在登録されているキーワードが表示されます．
+こんにちは、うちの老舗（どすえ）案内人の「しにりん」やで(*^^*)
+あなたの知りたい事柄に合った京都の老舗について案内するよ。
+検索方法は、「キーワードリストから検索」と「現在地から検索」の２通りあるよ。
+
+「キーワードリストから検索」では、気になるキーワードを入力すると、それに合った老舗情報が一覧表示されるよ。
+「現在地から検索する」場合は、マップ上に老舗が表示されるので、タッチすると情報が表示されるよ。
+気になる老舗が合ったらぜひ、訪れてみてね！　
+""".strip()
+
+NOTFOUND_MESSAGE = """
+入力したキーワードに関連する老舗は見つからへんなあ(´Д｀)
+別のキーワードを入力してみてね！
+""".strip()
+
+FOUND_MESSAGE = """
+お探しの老舗情報が見つかったで（＾▽＾)ノ
+詳しくは、「アイテム」もしくは「詳細」をタッチしてね♪
 """.strip()
 
 @app.route("/", methods=['POST'])
@@ -96,11 +111,15 @@ def handle_message(event):
         pass
     elif is_proper_noun(text):
         view = carousel_view(text)
-        line_bot_api.reply_message(event.reply_token, view)
+        line_bot_api.reply_message(
+            event.reply_token,
+            [TextSendMessage(text=FOUND_MESSAGE), view]
+        )
     else:
         line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage(text="ん〜〜「%s」は分からないなぁ...\n違う言葉で調べてね!!" % text))
+            TextSendMessage(text=NOTFOUND_MESSAGE)
+        )
 
 @handler.add(MessageEvent, message=LocationMessage)
 def handle_location_message(event):
@@ -200,7 +219,7 @@ def handle_posted_text(text):
     app.logger.info("Posted text: " + text)
     ret = get_stores_from_db(text)
     if not ret:
-        ret = TextSendMessage(text='見つからなかったよ')
+        ret = TextSendMessage(text='NOTFOUND_MESSAGE')
     return ret
 
 def carousel_view(text):
