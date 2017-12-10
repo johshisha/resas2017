@@ -1,8 +1,11 @@
-import os, requests, json, urllib.parse
+import os, requests, json, urllib.parse, urllib.request
 from math import sin, cos, acos, radians
 
+from io import BytesIO
+from PIL import Image
+
 from IPython import embed
-from flask import Flask, request, abort
+from flask import Flask, request, abort, send_file
 
 from linebot import (
     LineBotApi, WebhookHandler
@@ -12,8 +15,9 @@ from linebot.exceptions import (
 )
 from linebot.models import (
     MessageEvent, PostbackEvent, BeaconEvent,
-    TemplateSendMessage, TextMessage, TextSendMessage,
-    MessageTemplateAction, URITemplateAction, PostbackTemplateAction,
+    ImagemapArea, BaseSize,
+    TemplateSendMessage, TextMessage, TextSendMessage, ImagemapSendMessage,
+    MessageTemplateAction, URITemplateAction, PostbackTemplateAction,URIImagemapAction,
     CarouselTemplate, CarouselColumn, ImageCarouselTemplate, ImageCarouselColumn
 )
 
@@ -27,11 +31,26 @@ earth_rad = 6378.137
 
 IGNORE_TEXT_LIST = [
     'アイテム',
+    'マップ',
 ]
 
 # Load json data
 with open('../data.json') as f:
     STORE_DATA = json.load(f)
+
+@app.route("/imagemap/<path:url>/<size>", methods=['GET'])
+def imagemap(url, size):
+    print("あああああああああああああああああああ")
+    print(url)
+    map_image_url = urllib.parse.unquote(url)
+    response = requests.get(map_image_url)
+    img = Image.open(BytesIO(response.content))
+    img_resize = img.resize((int(size), int(size)))
+    byte_io = BytesIO()
+    img_resize.save(byte_io, 'PNG')
+    byte_io.seek(0)
+    return send_file(byte_io, mimetype='image/png')
+
 
 @app.route("/", methods=['POST'])
 def callback():
@@ -67,6 +86,9 @@ def handle_postback(event):
     params = {d.split('=')[0]: d.split('=')[1] for d in event.postback.data.split('&')}
     if params['action'] == 'show_items':
         view = handle_posted_postback(params)
+        line_bot_api.reply_message(event.reply_token, view)
+    elif params['action'] == 'show_maps':
+        view = googlemap_imagemap_view(params['text'])
         line_bot_api.reply_message(event.reply_token, view)
 
 def handle_posted_postback(params):
@@ -134,6 +156,11 @@ def carousel_view(text):
                     label='アイテム', text='アイテム',
                     data='text=%s&action=show_items&id=%d' % (text, i)
                 ),
+                PostbackTemplateAction(
+                    label='マップ', text='マップ',
+                    # data='text=%s&action=show_maps&id=%d' % (d['name'], i)
+                    data='text=%s&action=show_maps&id=%d' % (text, i)
+                ),
                 URITemplateAction(
                     label='詳細',
                     uri='http://example.com/1'
@@ -141,7 +168,6 @@ def carousel_view(text):
             ]
         )
         columns.append(carousel_column)
-
 
     view = TemplateSendMessage(
         alt_text='Carousel template',
@@ -168,24 +194,53 @@ def image_carousel_view(image_list):
     )
     return view
 
-def googlemap_link(text):
-    api_key = app.config['GOOGLE_API_KEY']
-    base_url = "https://maps.googleapis.com/maps/api/geocode/json?"
-    query = urllib.parse.urlencode({
+def googlemap_imagemap_view(text):
+    googlemap_geocoding_api_key = app.config['GOOGLE_MAP_API_KEY']
+    googlemap_geocoding_base_url = "https://maps.googleapis.com/maps/api/geocode/json?"
+    googlemap_geocoding_query = urllib.parse.urlencode({
         "address": text,
-        "key": api_key
+        "key": googlemap_geocoding_api_key
     })
-    url = base_url + query
-    try:
-        req = requests.get(url)
-        result = json.loads(req.text)
-        lat = result["results"][0]["geometry"]["location"]["lat"]
-        lng = result["results"][0]["geometry"]["location"]["lng"]
-        msg = TextSendMessage(text="comgooglemaps://?ll=%f,%f&q=%s" % (lat, lng, text))
-    except:
-        msg = TextSendMessage(text="申し訳有りません。「%s」は見つかりませんでした。" % text)
+    # try:
+    req = requests.get(googlemap_geocoding_base_url + googlemap_geocoding_query)
+    result = json.loads(req.text)
+    lat = result["results"][0]["geometry"]["location"]["lat"]
+    lng = result["results"][0]["geometry"]["location"]["lng"]
+    googlemap_staticmap_api_key = app.config['GOOGLE_STATIC_MAPS_API_KEY']
+    googlemap_staticmap_base_url = "https://maps.googleapis.com/maps/api/staticmap?"
+    googlemap_staticmap_query = urllib.parse.urlencode({
+        "center": "%s,%s" % (lat, lng),
+        "size": "520x520",
+        "sensor": "false",
+        "scale": 2,
+        "maptype": "roadmap",
+        "zoom": 18,
+        "markers": "%s,%s" % (lat, lng),
+        "key": googlemap_staticmap_api_key
+    })
+    googlemap_staticmap_url = googlemap_staticmap_base_url + googlemap_staticmap_query
+    # print(googlemap_staticmap_url)
 
-    return msg
+    # print('https://{}/imagemap/{}'.format(request.host, urllib.parse.quote_plus(googlemap_staticmap_url)))
+    view = ImagemapSendMessage(
+        base_url = 'https://{}/imagemap/{}'.format(request.host, urllib.parse.quote_plus(googlemap_staticmap_url)),
+        alt_text='googlemap',
+        base_size=BaseSize(height=1040, width=1040),
+        actions=[
+            URIImagemapAction(
+                link_uri="comgooglemaps://?ll=%f,%f&q=%s" % (lat, lng, text),
+                area=ImagemapArea(
+                    x=0, y=0, width=1040, height=1040
+                )
+            )
+        ]
+    )
+    print(view)
+
+    # except:
+    #     view = TextSendMessage(text="ん〜〜「%s」はGoogleMapにないなぁ..." % text)
+
+    return view
 
 def latlng_to_xyz(lat, lng):
     rlat, rlng = radians(lat), radians(lng)
