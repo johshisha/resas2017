@@ -44,10 +44,6 @@ IGNORE_TEXT_LIST = [
     'マップ',
 ]
 
-# Load json data
-with open('../data.json') as f:
-    STORE_DATA = json.load(f)
-
 @app.route("/imagemap/<path:url>/<size>", methods=['GET'])
 def imagemap(url, size):
     map_image_url = urllib.parse.unquote(url)
