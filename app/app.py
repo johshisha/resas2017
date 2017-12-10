@@ -13,7 +13,7 @@ from linebot.exceptions import (
 )
 from linebot.models import (
     MessageEvent, PostbackEvent, BeaconEvent,
-    TemplateSendMessage, TextMessage, TextSendMessage,
+    TemplateSendMessage, TextMessage, TextSendMessage, LocationMessage,
     MessageTemplateAction, URITemplateAction, PostbackTemplateAction,
     CarouselTemplate, CarouselColumn, ImageCarouselTemplate, ImageCarouselColumn
 )
@@ -85,6 +85,16 @@ def handle_message(event):
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(text="ん〜〜「%s」は分からないなぁ...\n違う言葉で調べてね!!" % text))
+
+@handler.add(MessageEvent, message=LocationMessage)
+def handle_location_message(event):
+    lat = event.message.latitude
+    lng = event.message.longitude
+    location = "あなたの位置情報\n緯度x経度 = {}x{}".format(lat, lng)
+    line_bot_api.reply_message(
+        event.reply_token,
+        TextSendMessage(text=location)
+    )
 
 @handler.add(PostbackEvent)
 def handle_postback(event):
