@@ -40,8 +40,6 @@ with open('../data.json') as f:
 
 @app.route("/imagemap/<path:url>/<size>", methods=['GET'])
 def imagemap(url, size):
-    print("あああああああああああああああああああ")
-    print(url)
     map_image_url = urllib.parse.unquote(url)
     response = requests.get(map_image_url)
     img = Image.open(BytesIO(response.content))
@@ -121,7 +119,6 @@ def is_proper_noun(text):
         # ART(人工物名)、ORG(組織名)、PSN(人名)、LOC(地名)
         "class_filter": "ART|ORG|PSN|LOC"
     })
-
     headers = {
         'content-type': 'application/json'
     }
@@ -158,7 +155,6 @@ def carousel_view(text):
                 ),
                 PostbackTemplateAction(
                     label='マップ', text='マップ',
-                    # data='text=%s&action=show_maps&id=%d' % (d['name'], i)
                     data='text=%s&action=show_maps&id=%d' % (text, i)
                 ),
                 URITemplateAction(
@@ -201,44 +197,42 @@ def googlemap_imagemap_view(text):
         "address": text,
         "key": googlemap_geocoding_api_key
     })
-    # try:
-    req = requests.get(googlemap_geocoding_base_url + googlemap_geocoding_query)
-    result = json.loads(req.text)
-    lat = result["results"][0]["geometry"]["location"]["lat"]
-    lng = result["results"][0]["geometry"]["location"]["lng"]
-    googlemap_staticmap_api_key = app.config['GOOGLE_STATIC_MAPS_API_KEY']
-    googlemap_staticmap_base_url = "https://maps.googleapis.com/maps/api/staticmap?"
-    googlemap_staticmap_query = urllib.parse.urlencode({
-        "center": "%s,%s" % (lat, lng),
-        "size": "520x520",
-        "sensor": "false",
-        "scale": 2,
-        "maptype": "roadmap",
-        "zoom": 18,
-        "markers": "%s,%s" % (lat, lng),
-        "key": googlemap_staticmap_api_key
-    })
-    googlemap_staticmap_url = googlemap_staticmap_base_url + googlemap_staticmap_query
-    # print(googlemap_staticmap_url)
+    try:
+        req = requests.get(googlemap_geocoding_base_url + googlemap_geocoding_query)
+        result = json.loads(req.text)
+        lat = result["results"][0]["geometry"]["location"]["lat"]
+        lng = result["results"][0]["geometry"]["location"]["lng"]
+        googlemap_staticmap_api_key = app.config['GOOGLE_STATIC_MAPS_API_KEY']
+        googlemap_staticmap_base_url = "https://maps.googleapis.com/maps/api/staticmap?"
+        googlemap_staticmap_query = urllib.parse.urlencode({
+            "center": "%s,%s" % (lat, lng),
+            "size": "520x520",
+            "sensor": "false",
+            "scale": 2,
+            "maptype": "roadmap",
+            "zoom": 18,
+            "markers": "%s,%s" % (lat, lng),
+            "key": googlemap_staticmap_api_key
+        })
+        googlemap_staticmap_url = googlemap_staticmap_base_url + googlemap_staticmap_query
 
-    # print('https://{}/imagemap/{}'.format(request.host, urllib.parse.quote_plus(googlemap_staticmap_url)))
-    view = ImagemapSendMessage(
-        base_url = 'https://{}/imagemap/{}'.format(request.host, urllib.parse.quote_plus(googlemap_staticmap_url)),
-        alt_text='googlemap',
-        base_size=BaseSize(height=1040, width=1040),
-        actions=[
-            URIImagemapAction(
-                link_uri="comgooglemaps://?ll=%f,%f&q=%s" % (lat, lng, text),
-                area=ImagemapArea(
-                    x=0, y=0, width=1040, height=1040
+        view = ImagemapSendMessage(
+            base_url = 'https://{}/imagemap/{}'.format(request.host, urllib.parse.quote_plus(googlemap_staticmap_url)),
+            alt_text='googlemap',
+            base_size=BaseSize(height=1040, width=1040),
+            actions=[
+                URIImagemapAction(
+                    # link_uri='comgooglemaps://?ll=%f,%f&q=%s' % (lat, lng, text),
+                    link_uri='http://maps.google.co.jp/maps?q=%f,%f' % (lat, lng),
+                    area=ImagemapArea(
+                        x=0, y=0, width=1040, height=1040
+                    )
                 )
-            )
-        ]
-    )
-    print(view)
+            ]
+        )
 
-    # except:
-    #     view = TextSendMessage(text="ん〜〜「%s」はGoogleMapにないなぁ..." % text)
+    except:
+        view = TextSendMessage(text="ん〜〜「%s」はGoogleMapにないなぁ..." % text)
 
     return view
 
