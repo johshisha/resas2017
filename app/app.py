@@ -6,6 +6,7 @@ from PIL import Image
 
 from IPython import embed
 from flask import Flask, request, abort, send_file
+from flaskext.mysql import MySQL
 
 from linebot import (
     LineBotApi, WebhookHandler
@@ -23,6 +24,15 @@ from linebot.models import (
 
 app = Flask(__name__)
 app.config.from_pyfile('./secret.cfg')
+
+mysql = MySQL()
+# MySQL configurations
+app.config['MYSQL_DATABASE_USER'] = 'root'
+app.config['MYSQL_DATABASE_DB'] = 'resas2017'
+app.config['MYSQL_DATABASE_HOST'] = 'localhost'
+mysql.init_app(app)
+conn = mysql.connect()
+cursor = conn.cursor()
 
 line_bot_api = LineBotApi(app.config['ACCESS_TOKEN'])
 handler = WebhookHandler(app.config['SECRET_KEY'])
@@ -48,7 +58,6 @@ def imagemap(url, size):
     img_resize.save(byte_io, 'PNG')
     byte_io.seek(0)
     return send_file(byte_io, mimetype='image/png')
-
 
 @app.route("/", methods=['POST'])
 def callback():
@@ -91,7 +100,9 @@ def handle_postback(event):
 
 def handle_posted_postback(params):
     store = handle_posted_text(params['text'])[int(params['id'])]
-    view = image_carousel_view(store['item_images'])
+    store_id, name, thumbnail, description, detail, lat, lng, beacon_id, visitor_count = store
+    items = get_items_from_db(store_id)
+    view = image_carousel_view(items)
     return view
 
 @handler.add(BeaconEvent)
@@ -128,26 +139,23 @@ def is_proper_noun(text):
 
 def handle_posted_text(text):
     app.logger.info("Posted text: " + text)
-    if text == '清水寺':
-        ret = STORE_DATA['kiyomizudera']
-    elif text == '伏見稲荷':
-        ret = STORE_DATA['hushimiinari']
-    else:
-        ret = '見つからなかったよ'
-
+    ret = get_stores_from_db(text)
+    if not ret:
+        ret = TextSendMessage(text='見つからなかったよ')
     return ret
 
 def carousel_view(text):
     data = handle_posted_text(text)
-    if isinstance(data, str):
+    if isinstance(data, TextSendMessage):
         return data
 
     columns = []
     for i, d in enumerate(data):
+        store_id, name, thumbnail, description, detail, lat, lng, beacon_id, visitor_count = d
         carousel_column = CarouselColumn(
-            thumbnail_image_url=d['image'],
-            title=d['name'],
-            text=d['description'],
+            thumbnail_image_url=thumbnail,
+            title=name,
+            text=description,
             actions=[
                 PostbackTemplateAction(
                     label='アイテム', text='アイテム',
@@ -157,28 +165,28 @@ def carousel_view(text):
                     label='マップ', text='マップ',
                     data='text=%s&action=show_maps&id=%d' % (text, i)
                 ),
-                URITemplateAction(
+                MessageTemplateAction(
                     label='詳細',
-                    uri='http://example.com/1'
+                    text=detail
                 )
             ]
         )
         columns.append(carousel_column)
 
     view = TemplateSendMessage(
-        alt_text='Carousel template',
+        alt_text='老舗の一覧',
         template=CarouselTemplate(columns=columns)
     )
     return view
 
 def image_carousel_view(image_list):
     columns_list = []
-    for image in image_list:
+    for image, label in image_list:
         columns_list.append(
             ImageCarouselColumn(
                 image_url=image,
                 action=URITemplateAction(
-                    label='詳細',
+                    label=label,
                     uri=image
                 )
             )
@@ -244,6 +252,49 @@ def latlng_to_xyz(lat, lng):
 def dist_on_sphere(pos0, pos1, radious=earth_rad):
     xyz0, xyz1 = latlng_to_xyz(*pos0), latlng_to_xyz(*pos1)
     return acos(sum(x * y for x, y in zip(xyz0, xyz1)))*radious
+
+def get_stores_from_db(keyword):
+    sql = """
+select
+  *
+from
+  stores
+where id in (
+  select
+    store_id
+  from
+    keyword_relationships
+  where
+    keyword_id in (
+        select
+        id
+      from
+        keywords
+      where
+        keyword = '{}'
+    )
+  )
+;
+    """.format(keyword)
+
+    cursor.execute(sql)
+    ret = cursor.fetchall()
+    return ret
+
+def get_items_from_db(store_id):
+    sql = """
+select
+  url, label
+from
+  items
+where
+  store_id = {}
+;
+    """.format(store_id)
+
+    cursor.execute(sql)
+    ret = cursor.fetchall()
+    return ret
 
 if __name__ == "__main__":
     app.run(debug=True)
