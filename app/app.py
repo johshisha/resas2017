@@ -4,6 +4,9 @@ from math import sin, cos, acos, radians
 from io import BytesIO
 from PIL import Image
 
+import numpy as np
+import math
+
 from IPython import embed
 from flask import Flask, request, abort, send_file
 from flaskext.mysql import MySQL
@@ -38,6 +41,8 @@ line_bot_api = LineBotApi(app.config['ACCESS_TOKEN'])
 handler = WebhookHandler(app.config['SECRET_KEY'])
 
 earth_rad = 6378.137
+offset = 268435456;
+radius = offset / np.pi;
 
 REGISTERED_TEXT_LIST = [
     '使い方',
@@ -107,10 +112,94 @@ def handle_location_message(event):
     lat = event.message.latitude
     lng = event.message.longitude
     location = "あなたの位置情報\n緯度x経度 = {}x{}".format(lat, lng)
-    line_bot_api.reply_message(
-        event.reply_token,
-        TextSendMessage(text=location)
+
+    sql = """
+select
+	id, lat, lng
+from
+	stores
+;
+    """
+
+    cursor.execute(sql)
+    stores = [d for d in cursor.fetchall()]
+    print(stores)
+    self_locate_maker = '&markers=color:{}|label:{}|{},{}'.format('blue', '', lat, lng)
+    # タップ可能なピンを配置する
+    center_lat_pixel, center_lon_pixel = latlon_to_pixel(lat, lng)
+
+    marker_color = 'red';
+    label = 'E';
+
+    # タップエリアのサイズ
+    pin_width = 60 * 1.5;
+    pin_height = 84 * 1.5;
+
+    actions = []
+    self_locate_maker = ''
+    for i, store in enumerate(stores):
+        self_locate = lat, lng
+        store_locate = store[1], store[2]
+        dist = dist_on_sphere(self_locate, store_locate)
+        print(dist)
+        # 3km以内
+        if dist < 3:
+            # 中心の緯度経度をピクセルに変換
+            target_lat_pixel, target_lon_pixel = latlon_to_pixel(store[1], store[2])
+
+            # 差分を計算
+            delta_lat_pixel  = (target_lat_pixel - center_lat_pixel) >> (21 - zoomlevel - 1);
+            delta_lon_pixel  = (target_lon_pixel - center_lon_pixel) >> (21 - zoomlevel - 1);
+
+            marker_lat_pixel = imagesize / 2 + delta_lat_pixel;
+            marker_lon_pixel = imagesize / 2 + delta_lon_pixel;
+
+            x = marker_lat_pixel
+            y = marker_lon_pixel
+
+            # 範囲外のを除外
+            if(pin_width / 2 < x < imagesize - pin_width / 2 and pin_height < y < imagesize - pin_width):
+
+                self_locate_maker += '&markers=color:{}|label:{}|{},{}'.format(marker_color, label, store[1], store[2])
+
+                actions.append(MessageImagemapAction(
+                    text = str(store[0]),
+                    area = ImagemapArea(
+                        x = x - pin_width / 2,
+                        y = y - pin_height / 2,
+                        width = pin_width,
+                        height = pin_height
+                    )
+                ))
+                if len(actions) > 10:
+                    break
+
+    googlemap_staticmap_api_key = app.config['GOOGLE_STATIC_MAPS_API_KEY']
+    googlemap_staticmap_base_url = "https://maps.googleapis.com/maps/api/staticmap?"
+    googlemap_staticmap_query = urllib.parse.urlencode({
+        "center": "%s,%s" % (lat, lng),
+        "size": "520x520",
+        "sensor": "false",
+        "scale": 2,
+        "maptype": "roadmap",
+        "zoom": 18,
+        "markers": "%s,%s" % (lat, lng),
+        "key": googlemap_staticmap_api_key
+    })
+    googlemap_staticmap_url = googlemap_staticmap_base_url + googlemap_staticmap_query + self_locate_maker + self_locate_maker
+    view = ImagemapSendMessage(
+        base_url = 'https://{}/imagemap/{}'.format(request.host, urllib.parse.quote_plus(googlemap_staticmap_url)),
+        alt_text='googlemap',
+        base_size=BaseSize(height=1040, width=1040),
+        actions=actions
     )
+
+    line_bot_api.reply_message(event.reply_token,view)
+
+def latlon_to_pixel(lat, lon):
+    lat_pixel = round(offset + radius * lon * np.pi / 180);
+    lon_pixel = round(offset - radius * math.log((1 + math.sin(lat * np.pi / 180)) / (1 - math.sin(lat * np.pi / 180))) / 2);
+    return lat_pixel, lon_pixel
 
 @handler.add(PostbackEvent)
 def handle_postback(event):
