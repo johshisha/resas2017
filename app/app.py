@@ -35,6 +35,11 @@ handler = WebhookHandler(app.config['SECRET_KEY'])
 
 earth_rad = 6378.137
 
+REGISTERED_TEXT_LIST = [
+    '使い方',
+    'キーワードリスト'
+]
+
 IGNORE_TEXT_LIST = [
     'アイテム'
 ]
@@ -42,6 +47,11 @@ IGNORE_TEXT_LIST = [
 INGORE_START_WITH = [
     '店舗の詳細\n'
 ]
+
+USAGE_TEXT = """
+入力されたキーワードに縁のある老舗を紹介します．
+「キーワードリスト」と入力すると，現在登録されているキーワードが表示されます．
+""".strip()
 
 @app.route("/", methods=['POST'])
 def callback():
@@ -62,15 +72,19 @@ def callback():
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    if ignore_text(event.message.text):
+    text = event.message.text
+    if regitered_text(text):
+        view = handle_registered_text(text)
+        line_bot_api.reply_message(event.reply_token, view)
+    elif ignore_text(text):
         pass
-    elif is_proper_noun(event.message.text):
-        view = carousel_view(event.message.text)
+    elif is_proper_noun(text):
+        view = carousel_view(text)
         line_bot_api.reply_message(event.reply_token, view)
     else:
         line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage(text="ん〜〜「%s」は分からないなぁ...\n違う言葉で調べてね!!" % event.message.text))
+            TextSendMessage(text="ん〜〜「%s」は分からないなぁ...\n違う言葉で調べてね!!" % text))
 
 @handler.add(PostbackEvent)
 def handle_postback(event):
@@ -84,6 +98,26 @@ def handle_posted_postback(params):
     store_id, name, thumbnail, description, detail, lat, lng, beacon_id, visitor_count = store
     items = get_items_from_db(store_id)
     view = image_carousel_view(items)
+    return view
+
+def handle_registered_text(text):
+    if text == '使い方':
+        view = TextSendMessage(text=USAGE_TEXT)
+    elif text == 'キーワードリスト':
+        sql = """
+select
+	keyword
+from
+	keywords
+order by
+	rand()
+limit 10
+;
+            """
+
+        cursor.execute(sql)
+        ret = '\n'.join([d[0] for d in cursor.fetchall()]).strip()
+        view = TextSendMessage(text="現在登録されているキーワードの例\n"+ret)
     return view
 
 @handler.add(BeaconEvent)
@@ -109,6 +143,9 @@ def ignore_text(text):
                 return True
         else:
             return False
+
+def regitered_text(text):
+    return text in REGISTERED_TEXT_LIST
 
 def is_proper_noun(text):
     api_key = app.config['GOO_API_KEY']
