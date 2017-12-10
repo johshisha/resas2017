@@ -346,26 +346,7 @@ def carousel_view(text):
 
     columns = []
     for i, d in enumerate(data):
-        store_id, name, thumbnail, description, detail, lat, lng, beacon_id, visitor_count = d
-        carousel_column = CarouselColumn(
-            thumbnail_image_url=thumbnail,
-            title=name,
-            text=description,
-            actions=[
-                PostbackTemplateAction(
-                    label='アイテム', text='アイテム',
-                    data='name=%s&action=show_items' % (name)
-                ),
-                PostbackTemplateAction(
-                    label='マップ', text='マップ',
-                    data='text=%s&action=show_maps' % (name)
-                ),
-                MessageTemplateAction(
-                    label='詳細',
-                    text="店舗の詳細\n"+detail
-                )
-            ]
-        )
+        carousel_column = create_carousel_column(d)
         columns.append(carousel_column)
 
     view = TemplateSendMessage(
