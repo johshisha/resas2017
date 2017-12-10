@@ -36,7 +36,11 @@ handler = WebhookHandler(app.config['SECRET_KEY'])
 earth_rad = 6378.137
 
 IGNORE_TEXT_LIST = [
-    'アイテム',
+    'アイテム'
+]
+
+INGORE_START_WITH = [
+    '店舗の詳細\n'
 ]
 
 @app.route("/", methods=['POST'])
@@ -96,7 +100,15 @@ def handle_posted_beacon(data):
     return msg
 
 def ignore_text(text):
-    return text in IGNORE_TEXT_LIST
+    flag = text in IGNORE_TEXT_LIST
+    if flag:
+        return flag
+    else:
+        for t in INGORE_START_WITH:
+            if text.startswith(t):
+                return True
+        else:
+            return False
 
 def is_proper_noun(text):
     api_key = app.config['GOO_API_KEY']
@@ -141,7 +153,7 @@ def carousel_view(text):
                 ),
                 MessageTemplateAction(
                     label='詳細',
-                    text=detail
+                    text="店舗の詳細\n"+detail
                 )
             ]
         )
